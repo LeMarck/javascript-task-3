@@ -8,7 +8,7 @@ exports.isStar = true;
 
 var util = require('util');
 
-var WEEK = ['ПН', 'ВТ', 'СР'];
+var WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 var DATE = /^([А-Я]{2})?[ ]?(\d{2}):(\d{2})\+(\d{1,2})$/;
 var HOUR = 60;
 var DAY = 24 * HOUR;
@@ -84,9 +84,9 @@ Object.defineProperties(AppropriateMoment.prototype, {
         value: function (schedule, duration, workingHours) {
             this._workingHours = workingHours;
             this._schedule = schedule;
-
+            this._robberyWeek = WEEK.slice(0, 3);
             this._start = new DateTime(workingHours.from);
-            this._deadline = new DateTime(WEEK.slice(-1)[0].concat(workingHours.to));
+            this._deadline = new DateTime(this._robberyWeek[2].concat(workingHours.to));
             this._duration = duration;
             this._badInterval = this.__workingHours.concat(this.__schedule);
             this._exists = this._run();
@@ -100,7 +100,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
          */
         get: function () {
             var notWorkingTime = [];
-            for (var index = 0; index < WEEK.length - 1; index++) {
+            for (var index = 0; index < this._robberyWeek.length - 1; index++) {
                 notWorkingTime.push([
                     new DateTime(WEEK[index].concat(this._workingHours.to)).ticks,
                     new DateTime(WEEK[index + 1].concat(this._workingHours.from)).ticks
