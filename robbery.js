@@ -10,6 +10,7 @@ var WEEK = ['ПН', 'ВТ', 'СР'];
 var HOUR = 60;
 var DAY = 24 * HOUR;
 
+
 var DateTime = function (time) {
     this._init(time);
 };
@@ -41,97 +42,168 @@ Object.defineProperties(DateTime.prototype, {
     }
 });
 
-var Robbery = function (schedule, workingHours) {
-    this._init(schedule, workingHours);
+/**
+ * @param {Object} schedule – Расписание Банды
+ * @param {Number} duration - Время на ограбление в минутах
+ * @param {Object} workingHours – Время работы банка
+ * @param {String} workingHours.from – Время открытия, например, "10:00+5"
+ * @param {String} workingHours.to – Время закрытия, например, "18:00+5"
+ */
+var AppropriateMoment = function (schedule, duration, workingHours) {
+    this._init(schedule, duration, workingHours);
 };
 
-Object.defineProperties(Robbery.prototype, {
+Object.defineProperties(AppropriateMoment.prototype, {
     _init: {
-        value: function (schedule, workingHours) {
-            this.start = new DateTime(workingHours.from);
-            this.deadline = new DateTime(WEEK.slice(-1)[0].concat(workingHours.to));
-            this.badTimes = this._notWorkingTime(workingHours)
-                .concat(this._membersBisyHours(schedule))
-                .sort(function (first, second) {
-                    return first[0] > second[0];
-                });
-            this.times = [];
+
+        /**
+         * @param {Object} schedule – Расписание Банды
+         * @param {Number} duration - Время на ограбление в минутах
+         * @param {Object} workingHours – Время работы банка
+         * @param {String} workingHours.from – Время открытия, например, "10:00+5"
+         * @param {String} workingHours.to – Время закрытия, например, "18:00+5"
+         */
+        value: function (schedule, duration, workingHours) {
+            this._workingHours = workingHours;
+            this._schedule = schedule;
+
+            this._start = new DateTime(workingHours.from);
+            this._deadline = new DateTime(WEEK.slice(-1)[0].concat(workingHours.to));
+            this._duration = duration;
+            this._badInterval = this.__workingHours.concat(this.__schedule);
+            this._exists = this._run();
         }
     },
-    _notWorkingTime: {
-        value: function (workingHours) {
+    __workingHours: {
+
+        /**
+         * Не рабочее время банка
+         * @returns {Array}
+         */
+        get: function () {
             var notWorkingTime = [];
             for (var index = 0; index < WEEK.length - 1; index++) {
                 notWorkingTime.push([
-                    new DateTime(WEEK[index].concat(workingHours.to)).ticks,
-                    new DateTime(WEEK[index + 1].concat(workingHours.from)).ticks
+                    new DateTime(WEEK[index].concat(this._workingHours.to)).ticks,
+                    new DateTime(WEEK[index + 1].concat(this._workingHours.from)).ticks
                 ]);
             }
 
             return notWorkingTime;
         }
     },
-    _membersBisyHours: {
-        value: function (schedule) {
-            var timezone = this.deadline.timezone;
-            var membersBisyHours = [];
+    __schedule: {
+
+        /**
+         * Интервалы занятости грабителей
+         * @returns {Array}
+         */
+        get: function () {
+            var timezone = this._deadline.timezone;
+            var schedule = this._schedule;
+            var bisyTime = [];
             Object.keys(schedule)
                 .forEach(function (name) {
                     schedule[name].forEach(function (interval) {
-                        membersBisyHours.push([
+                        bisyTime.push([
                             new DateTime(interval.from).setTimezone(timezone).ticks,
                             new DateTime(interval.to).setTimezone(timezone).ticks
                         ]);
                     });
                 });
 
-            return membersBisyHours;
+            return bisyTime;
         }
     },
-    _badIntervals: {
-        value: function (start, end) {
-            return this.badTimes.filter(function (interval) {
-                return (interval[0] <= start && start < interval[1]) ||
-                    (interval[0] < end && end <= interval[1]);
-            });
+    _isBadInterval: {
+
+        /**
+         * Проверка предпологаемого времени
+         * @param {Number} start
+         * @returns {Array}
+         */
+        value: function (start) {
+            var end = start + this._duration;
+
+            return this._badInterval
+                .filter(function (interval) {
+                    return (interval[0] <= start && start < interval[1]) ||
+                        (interval[0] < end && end <= interval[1]);
+                })
+                .map(function (interval) {
+                    return interval[1];
+                });
         }
     },
-    run: {
-        value: function (duration) {
-            while (this.start.ticks + duration < this.deadline.ticks) {
-                var times = this._badIntervals(this.start.ticks, this.start.ticks + duration);
+    _run: {
+
+        /**
+         * Ограбление
+         * @returns {boolean}
+         */
+        value: function () {
+            while (this._start.ticks + this._duration < this._deadline.ticks) {
+                var times = this._isBadInterval(this._start.ticks);
                 if (times.length === 0) {
-                    this.times.push(this.start.ticks);
-                    this.start.ticks += 30;
-                } else {
-                    this.start.ticks = times.slice(-1)[0][1];
+                    this._time = this._start.ticks;
+
+                    return true;
                 }
+                this._start.ticks = Math.max.apply(Math, times);
             }
+            this._start.ticks = this._time;
+
+            return false;
         }
     },
-    hasNext: {
-        get: function () {
-            return this.times.length !== 0;
+    exists: {
+
+        /**
+         * Найдено ли время
+         * @returns {Boolean}
+         */
+        value: function () {
+            return this._exists;
         }
     },
-    next: {
-        get: function () {
-            return this.times.shift();
+    format: {
+
+        /**
+         * Возвращает отформатированную строку с часами для ограбления
+         * Например,
+         *   "Начинаем в %HH:%MM (%DD)" -> "Начинаем в 14:59 (СР)"
+         * @param {String} template
+         * @returns {String}
+         */
+        value: function (template) {
+            if (!this._time) {
+                return '';
+            }
+            var day = WEEK[Math.floor(this._time / DAY)];
+            var hour = Math.floor((this._time % DAY) / HOUR);
+            hour = hour < 10 ? '0' + hour : hour;
+            var minutes = (this._time % DAY) % HOUR;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+
+            return template.replace('%DD', day)
+                .replace('%HH', hour)
+                .replace('%MM', minutes);
+        }
+    },
+    tryLater: {
+
+        /**
+         * Попробовать найти часы для ограбления позже [*]
+         * @star
+         * @returns {Boolean}
+         */
+        value: function () {
+            this._start.ticks += 30;
+
+            return this._run();
         }
     }
 });
-
-var convert = function (time, temp) {
-    var day = WEEK[Math.floor(time / DAY)];
-    var hour = Math.floor((time % DAY) / HOUR);
-    hour = hour < 10 ? '0' + hour : hour;
-    var minutes = (time % DAY) % HOUR;
-    minutes = minutes < 10 ? '0' + minutes : minutes;
-
-    return temp.replace('%DD', day)
-        .replace('%HH', hour)
-        .replace('%MM', minutes);
-};
 
 /**
  * @param {Object} schedule – Расписание Банды
@@ -142,11 +214,7 @@ var convert = function (time, temp) {
  * @returns {Object}
  */
 exports.getAppropriateMoment = function (schedule, duration, workingHours) {
-    // console.info(schedule, duration, workingHours);
-    var robbery = new Robbery(schedule, workingHours);
-    robbery.run(duration);
-
-    var time = robbery.next || null;
+    var robbery = new AppropriateMoment(schedule, duration, workingHours);
 
     return {
 
@@ -155,7 +223,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {Boolean}
          */
         exists: function () {
-            return time !== null;
+            return robbery.exists();
         },
 
         /**
@@ -166,11 +234,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {String}
          */
         format: function (template) {
-            if (!time) {
-                return '';
-            }
-
-            return convert(time, template);
+            return robbery.format(template);
         },
 
         /**
@@ -179,10 +243,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {Boolean}
          */
         tryLater: function () {
-            var tryStatus = robbery.hasNext;
-            time = robbery.next || time;
-
-            return tryStatus;
+            return robbery.tryLater();
         }
     };
 };
