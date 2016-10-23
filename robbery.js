@@ -163,6 +163,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
          * @returns {Boolean}
          */
         value: function () {
+
             return this._exists;
         }
     },
@@ -176,7 +177,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
          * @returns {String}
          */
         value: function (template) {
-            if (!this._time) {
+            if (isNaN(this._time)) {
                 return '';
             }
             var day = WEEK[Math.floor(this._time / DAY)];
