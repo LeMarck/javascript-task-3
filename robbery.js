@@ -6,7 +6,10 @@
  */
 exports.isStar = true;
 
+var util = require('util');
+
 var WEEK = ['ПН', 'ВТ', 'СР'];
+var DATE = /^([А-Я]{2})?[ ]?(\d{2}):(\d{2})\+(\d{1,2})$/;
 var HOUR = 60;
 var DAY = 24 * HOUR;
 
@@ -18,10 +21,15 @@ var DateTime = function (time) {
 Object.defineProperties(DateTime.prototype, {
     _init: {
         value: function (time) {
-            var token = /^([А-Я]{2})?[ ]?(\d{2}):(\d{2})\+(\d{1,2})$/.exec(time);
+            var token = DATE.exec(time);
             this.timezone = Number(token[4]);
             this._ticks = WEEK.indexOf(token[1] || 'ПН') * DAY +
                 Number(token[2]) * HOUR + Number(token[3]);
+        }
+    },
+    _toTime: {
+        value: function (ticks) {
+            return ticks < 10 ? '0' + ticks : ticks;
         }
     },
     ticks: {
@@ -38,6 +46,16 @@ Object.defineProperties(DateTime.prototype, {
             this.timezone = timezone;
 
             return this;
+        }
+    },
+    toString: {
+        value: function () {
+            var ticks = this._ticks;
+            var day = WEEK[Math.floor(ticks / DAY)];
+            var hour = this._toTime(Math.floor((ticks % DAY) / HOUR));
+            var minutes = this._toTime((ticks % DAY) % HOUR);
+
+            return util.format('%s %s:%s+%s', day, hour, minutes, this.timezone);
         }
     }
 });
@@ -180,15 +198,12 @@ Object.defineProperties(AppropriateMoment.prototype, {
             if (isNaN(this._time)) {
                 return '';
             }
-            var day = WEEK[Math.floor(this._time / DAY)];
-            var hour = Math.floor((this._time % DAY) / HOUR);
-            hour = hour < 10 ? '0' + hour : hour;
-            var minutes = (this._time % DAY) % HOUR;
-            minutes = minutes < 10 ? '0' + minutes : minutes;
+            template = template.replace('%DD', '$1')
+                .replace('%HH', '$2')
+                .replace('%MM', '$3');
 
-            return template.replace('%DD', day)
-                .replace('%HH', hour)
-                .replace('%MM', minutes);
+            return this._start.toString()
+                .replace(DATE, template);
         }
     },
     tryLater: {
