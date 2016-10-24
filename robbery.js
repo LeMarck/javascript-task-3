@@ -9,7 +9,7 @@ exports.isStar = true;
 var util = require('util');
 
 var WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-var DATE = /^([А-Я]{2})?[ ]?(\d{2}):(\d{2})\+(\d{1,2})$/;
+var DATE = /^([А-Я]{2})?[ ]?(\d\d):(\d\d)\+(\d+)$/;
 var HOUR = 60;
 var DAY = 24 * HOUR;
 
@@ -36,13 +36,13 @@ Object.defineProperties(DateTime.prototype, {
         get: function () {
             return this._ticks;
         },
-        set: function (time) {
-            this._ticks = time;
+        set: function (ticks) {
+            this._ticks = ticks;
         }
     },
     setTimezone: {
         value: function (timezone) {
-            this._ticks -= (this.timezone - timezone) * 60;
+            this._ticks -= (this.timezone - timezone) * HOUR;
             this.timezone = timezone;
 
             return this;
@@ -125,7 +125,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
                     schedule[name].forEach(function (interval) {
                         var from = new DateTime(interval.from).setTimezone(timezone).ticks;
                         var to = new DateTime(interval.to).setTimezone(timezone).ticks;
-                        from = from < to ? from : 0;
+                        from = from < to && from > 0 ? from : 0;
                         bisyTime.push([from, to]);
                     });
                 });
@@ -137,7 +137,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
 
         /**
          * Проверка предпологаемого времени
-         * @param {Number} start
+         * @param {Number} start - Предпологаемое время
          * @returns {Array}
          */
         value: function (start) {
@@ -191,7 +191,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
          * Возвращает отформатированную строку с часами для ограбления
          * Например,
          *   "Начинаем в %HH:%MM (%DD)" -> "Начинаем в 14:59 (СР)"
-         * @param {String} template
+         * @param {String} template - Шаблон
          * @returns {String}
          */
         value: function (template) {
