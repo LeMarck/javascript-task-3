@@ -160,7 +160,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
          * @returns {boolean}
          */
         value: function () {
-            while (this._start.ticks + this._duration < this._deadline.ticks) {
+            while (this._start.ticks + this._duration <= this._deadline.ticks) {
                 var times = this._isBadInterval(this._start.ticks);
                 if (times.length === 0) {
                     this._time = this._start.ticks;
