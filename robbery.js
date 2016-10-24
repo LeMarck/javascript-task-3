@@ -4,7 +4,7 @@
  * Сделано задание на звездочку
  * Реализовано оба метода и tryLater
  */
-exports.isStar = false;
+exports.isStar = true;
 
 var util = require('util');
 
@@ -123,10 +123,10 @@ Object.defineProperties(AppropriateMoment.prototype, {
             Object.keys(schedule)
                 .forEach(function (name) {
                     schedule[name].forEach(function (interval) {
-                        bisyTime.push([
-                            new DateTime(interval.from).setTimezone(timezone).ticks,
-                            new DateTime(interval.to).setTimezone(timezone).ticks
-                        ]);
+                        var from = new DateTime(interval.from).setTimezone(timezone).ticks;
+                        var to = new DateTime(interval.to).setTimezone(timezone).ticks;
+                        from = from < to ? from : 0;
+                        bisyTime.push([from, to]);
                     });
                 });
 
