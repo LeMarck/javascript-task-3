@@ -29,7 +29,7 @@ Object.defineProperties(DateTime.prototype, {
     },
     _toTime: {
         value: function (ticks) {
-            return ticks < 10 ? '0' + ticks : ticks;
+            return (ticks < 10 ? '0' : '') + ticks;
         }
     },
     ticks: {
@@ -88,11 +88,11 @@ Object.defineProperties(AppropriateMoment.prototype, {
             this._start = new DateTime(workingHours.from);
             this._deadline = new DateTime(this._robberyWeek[2].concat(workingHours.to));
             this._duration = duration;
-            this._badInterval = this.__workingHours.concat(this.__schedule);
+            this._badInterval = this._notWorkingHours.concat(this._scheduleIntervals);
             this._exists = this._run();
         }
     },
-    __workingHours: {
+    _notWorkingHours: {
 
         /**
          * Не рабочее время банка
@@ -110,7 +110,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
             return notWorkingTime;
         }
     },
-    __schedule: {
+    _scheduleIntervals: {
 
         /**
          * Интервалы занятости грабителей
@@ -145,8 +145,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
 
             return this._badInterval
                 .filter(function (interval) {
-                    return (interval[0] <= start && start < interval[1]) ||
-                        (interval[0] < end && end <= interval[1]);
+                    return (interval[0] < start && start < interval[1]) ||
+                        (interval[0] < end && end < interval[1]);
                 })
                 .map(function (interval) {
                     return interval[1];
