@@ -145,8 +145,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
 
             return this._badInterval
                 .filter(function (interval) {
-                    return (interval[0] < start && start < interval[1]) ||
-                        (interval[0] < end && end < interval[1]);
+                    return (interval[0] <= start && start < interval[1]) ||
+                        (interval[0] < end && end <= interval[1]);
                 })
                 .map(function (interval) {
                     return interval[1];
@@ -168,6 +168,11 @@ Object.defineProperties(AppropriateMoment.prototype, {
                     return true;
                 }
                 this._start.ticks = Math.max.apply(Math, times);
+                if (this._duration === 0) {
+                    this._time = this._start.ticks;
+
+                    return true;
+                }
             }
             this._start.ticks = this._time;
 
