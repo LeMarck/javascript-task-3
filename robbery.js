@@ -6,8 +6,6 @@
  */
 exports.isStar = true;
 
-var util = require('util');
-
 var WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 var DATE = /^([А-Я]{2})?[ ]?(\d\d):(\d\d)\+(\d+)$/;
 var HOUR = 60;
@@ -21,28 +19,28 @@ var DateTime = function (time) {
 Object.defineProperties(DateTime.prototype, {
     _init: {
         value: function (time) {
-            var token = DATE.exec(time);
-            this.timezone = Number(token[4]);
-            this._ticks = WEEK.indexOf(token[1] || 'ПН') * DAY +
-                Number(token[2]) * HOUR + Number(token[3]);
+            var tokens = DATE.exec(time);
+            this.timezone = Number(tokens[4]);
+            this._minutes = WEEK.indexOf(tokens[1] || 'ПН') * DAY +
+                Number(tokens[2]) * HOUR + Number(tokens[3]);
         }
     },
     _toTime: {
-        value: function (ticks) {
-            return (ticks < 10 ? '0' : '') + ticks;
+        value: function (minutes) {
+            return (minutes < 10 ? '0' : '') + minutes;
         }
     },
-    ticks: {
+    minutes: {
         get: function () {
-            return this._ticks;
+            return this._minutes;
         },
-        set: function (ticks) {
-            this._ticks = ticks;
+        set: function (minutes) {
+            this._minutes = minutes;
         }
     },
     setTimezone: {
         value: function (timezone) {
-            this._ticks -= (this.timezone - timezone) * HOUR;
+            this._minutes -= (this.timezone - timezone) * HOUR;
             this.timezone = timezone;
 
             return this;
@@ -50,37 +48,21 @@ Object.defineProperties(DateTime.prototype, {
     },
     toString: {
         value: function () {
-            var ticks = this._ticks;
-            var day = WEEK[Math.floor(ticks / DAY)];
-            var hour = this._toTime(Math.floor((ticks % DAY) / HOUR));
-            var minutes = this._toTime((ticks % DAY) % HOUR);
+            var day = WEEK[Math.floor(this._minutes / DAY)];
+            var hour = this._toTime(Math.floor((this._minutes % DAY) / HOUR));
+            var minutes = this._toTime((this._minutes % DAY) % HOUR);
 
-            return util.format('%s %s:%s+%s', day, hour, minutes, this.timezone);
+            return day + ' ' + hour + ':' + minutes + '+' + this.timezone;
         }
     }
 });
 
-/**
- * @param {Object} schedule – Расписание Банды
- * @param {Number} duration - Время на ограбление в минутах
- * @param {Object} workingHours – Время работы банка
- * @param {String} workingHours.from – Время открытия, например, "10:00+5"
- * @param {String} workingHours.to – Время закрытия, например, "18:00+5"
- */
 var AppropriateMoment = function (schedule, duration, workingHours) {
     this._init(schedule, duration, workingHours);
 };
 
 Object.defineProperties(AppropriateMoment.prototype, {
     _init: {
-
-        /**
-         * @param {Object} schedule – Расписание Банды
-         * @param {Number} duration - Время на ограбление в минутах
-         * @param {Object} workingHours – Время работы банка
-         * @param {String} workingHours.from – Время открытия, например, "10:00+5"
-         * @param {String} workingHours.to – Время закрытия, например, "18:00+5"
-         */
         value: function (schedule, duration, workingHours) {
             this._workingHours = workingHours;
             this._schedule = schedule;
@@ -88,22 +70,17 @@ Object.defineProperties(AppropriateMoment.prototype, {
             this._start = new DateTime(workingHours.from);
             this._deadline = new DateTime(this._robberyWeek[2].concat(workingHours.to));
             this._duration = duration;
-            this._badInterval = this._notWorkingHours.concat(this._scheduleIntervals);
+            this._badIntervals = this._notWorkingHours.concat(this._scheduleIntervals);
             this._exists = this._run();
         }
     },
     _notWorkingHours: {
-
-        /**
-         * Не рабочее время банка
-         * @returns {Array}
-         */
         get: function () {
             var notWorkingTime = [];
             for (var index = 0; index < this._robberyWeek.length - 1; index++) {
                 notWorkingTime.push([
-                    new DateTime(WEEK[index].concat(this._workingHours.to)).ticks,
-                    new DateTime(WEEK[index + 1].concat(this._workingHours.from)).ticks
+                    new DateTime(WEEK[index].concat(this._workingHours.to)).minutes,
+                    new DateTime(WEEK[index + 1].concat(this._workingHours.from)).minutes
                 ]);
             }
 
@@ -111,39 +88,28 @@ Object.defineProperties(AppropriateMoment.prototype, {
         }
     },
     _scheduleIntervals: {
-
-        /**
-         * Интервалы занятости грабителей
-         * @returns {Array}
-         */
         get: function () {
             var timezone = this._deadline.timezone;
             var schedule = this._schedule;
-            var bisyTime = [];
+            var bisyTimes = [];
             Object.keys(schedule)
                 .forEach(function (name) {
                     schedule[name].forEach(function (interval) {
-                        var from = new DateTime(interval.from).setTimezone(timezone).ticks;
-                        var to = new DateTime(interval.to).setTimezone(timezone).ticks;
+                        var from = new DateTime(interval.from).setTimezone(timezone).minutes;
+                        var to = new DateTime(interval.to).setTimezone(timezone).minutes;
                         from = from < to && from > 0 ? from : 0;
-                        bisyTime.push([from, to]);
+                        bisyTimes.push([from, to]);
                     });
                 });
 
-            return bisyTime;
+            return bisyTimes;
         }
     },
-    _isBadInterval: {
-
-        /**
-         * Проверка предпологаемого времени
-         * @param {Number} start - Предпологаемое время
-         * @returns {Array}
-         */
+    _getBadIntervals: {
         value: function (start) {
             var end = start + this._duration;
 
-            return this._badInterval
+            return this._badIntervals
                 .filter(function (interval) {
                     return (interval[0] <= start && start < interval[1]) ||
                         (interval[0] < end && end <= interval[1]) ||
@@ -155,46 +121,28 @@ Object.defineProperties(AppropriateMoment.prototype, {
         }
     },
     _run: {
-
-        /**
-         * Ограбление
-         * @returns {boolean}
-         */
         value: function () {
-            while (this._start.ticks + this._duration <= this._deadline.ticks) {
-                var times = this._isBadInterval(this._start.ticks);
-                if (times.length === 0) {
-                    this._time = this._start.ticks;
+            while (this._start.minutes + this._duration <= this._deadline.minutes) {
+                var badIntervals = this._getBadIntervals(this._start.minutes);
+                if (badIntervals.length === 0) {
+                    this._time = this._start.minutes;
 
                     return true;
                 }
-                this._start.ticks = Math.max.apply(Math, times);
+                this._start.minutes = Math.max.apply(Math, badIntervals);
             }
-            this._start.ticks = this._time;
+            this._start.minutes = this._time;
 
             return false;
         }
     },
     exists: {
-
-        /**
-         * Найдено ли время
-         * @returns {Boolean}
-         */
         value: function () {
 
             return this._exists;
         }
     },
     format: {
-
-        /**
-         * Возвращает отформатированную строку с часами для ограбления
-         * Например,
-         *   "Начинаем в %HH:%MM (%DD)" -> "Начинаем в 14:59 (СР)"
-         * @param {String} template - Шаблон
-         * @returns {String}
-         */
         value: function (template) {
             if (isNaN(this._time)) {
                 return '';
@@ -208,14 +156,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
         }
     },
     tryLater: {
-
-        /**
-         * Попробовать найти часы для ограбления позже [*]
-         * @star
-         * @returns {Boolean}
-         */
         value: function () {
-            this._start.ticks += 30;
+            this._start.minutes += 30;
 
             return this._run();
         }
