@@ -52,7 +52,7 @@ Object.defineProperties(AppropriateMoment.prototype, {
         value: function (schedule, workingHours) {
             this._robberyWeek = WEEK.slice(0, 3);
             this._start = new DateTime(workingHours.from);
-            this._deadline = new DateTime(this._robberyWeek[2].concat(workingHours.to));
+            this._deadline = new DateTime(this._robberyWeek[2] + workingHours.to);
             this._badIntervals = this._getBankCloseIntervals(workingHours)
                 .concat(this._getGangsBusyIntervals(schedule));
         }
@@ -62,8 +62,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
             var notWorkingTime = [];
             for (var index = 0; index < this._robberyWeek.length - 1; index++) {
                 notWorkingTime.push([
-                    new DateTime(WEEK[index].concat(workingHours.to)).minutes,
-                    new DateTime(WEEK[index + 1].concat(workingHours.from)).minutes
+                    new DateTime(WEEK[index] + workingHours.to).minutes,
+                    new DateTime(WEEK[index + 1] + workingHours.from).minutes
                 ]);
             }
 
@@ -152,12 +152,12 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {String}
          */
         format: function (template) {
-            if (!time) {
+            if (!exists) {
                 return '';
             }
             var day = WEEK[Math.floor(time / DAY)];
-            var hour = (Math.floor((time % DAY) / HOUR));
-            var minutes = ((time % DAY) % HOUR);
+            var hour = Math.floor((time % DAY) / HOUR);
+            var minutes = (time % DAY) % HOUR;
 
             return template.replace('%DD', day)
                 .replace('%HH', (hour < 10 ? '0' : '') + hour)
