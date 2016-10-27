@@ -43,11 +43,11 @@ Object.defineProperties(Moment.prototype, {
     }
 });
 
-var AppropriateMoment = function (schedule, workingHours) {
+var Robbery = function (schedule, workingHours) {
     this._init(schedule, workingHours);
 };
 
-Object.defineProperties(AppropriateMoment.prototype, {
+Object.defineProperties(Robbery.prototype, {
     _init: {
         value: function (schedule, workingHours) {
             this._robberyWeek = WEEK.slice(0, 3);
@@ -128,8 +128,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
  * @returns {Object}
  */
 exports.getAppropriateMoment = function (schedule, duration, workingHours) {
-    var appropriateMoment = new AppropriateMoment(schedule, workingHours);
-    var robberyMoments = appropriateMoment.getMoments(duration);
+    var robbery = new Robbery(schedule, workingHours);
+    var robberyMoments = robbery.getMoments(duration);
     var exists = robberyMoments.length !== 0;
     var time = robberyMoments.shift();
 
