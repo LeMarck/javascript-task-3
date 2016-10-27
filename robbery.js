@@ -7,25 +7,25 @@
 exports.isStar = true;
 
 var WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-var DATE = /^([А-Я]{2})?[ ]?(\d\d):(\d\d)\+(\d+)$/;
+var MOMENT_PATTERN = /^([А-Я]{2})?\s?(\d{2}):(\d{2})\+(\d{1,2})$/;
 var HOUR = 60;
 var DAY = 24 * HOUR;
 
 
-var DateTime = function (time) {
+var Moment = function (time) {
     this._init(time);
 };
 
-Object.defineProperties(DateTime.prototype, {
+Object.defineProperties(Moment.prototype, {
     _init: {
         value: function (time) {
-            var tokens = DATE.exec(time);
+            var tokens = MOMENT_PATTERN.exec(time);
             this.timezone = Number(tokens[4]);
             this._minutes = WEEK.indexOf(tokens[1] || 'ПН') * DAY +
                 Number(tokens[2]) * HOUR + Number(tokens[3]);
         }
     },
-    minutes: {
+    moment: {
         get: function () {
             return this._minutes;
         },
@@ -51,8 +51,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
     _init: {
         value: function (schedule, workingHours) {
             this._robberyWeek = WEEK.slice(0, 3);
-            this._start = new DateTime(workingHours.from);
-            this._deadline = new DateTime(this._robberyWeek[2] + workingHours.to);
+            this._start = new Moment(workingHours.from);
+            this._deadline = new Moment(this._robberyWeek[2] + workingHours.to);
             this._badIntervals = this._getBankCloseIntervals(workingHours)
                 .concat(this._getGangsBusyIntervals(schedule));
         }
@@ -62,8 +62,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
             var notWorkingTime = [];
             for (var index = 0; index < this._robberyWeek.length - 1; index++) {
                 notWorkingTime.push([
-                    new DateTime(WEEK[index] + workingHours.to).minutes,
-                    new DateTime(WEEK[index + 1] + workingHours.from).minutes
+                    new Moment(WEEK[index] + workingHours.to).moment,
+                    new Moment(WEEK[index + 1] + workingHours.from).moment
                 ]);
             }
 
@@ -74,15 +74,14 @@ Object.defineProperties(AppropriateMoment.prototype, {
         value: function (schedule) {
             var timezone = this._deadline.timezone;
             var busyTimes = [];
-            Object.keys(schedule)
-                .forEach(function (name) {
-                    schedule[name].forEach(function (interval) {
-                        var from = new DateTime(interval.from).setTimezone(timezone).minutes;
-                        var to = new DateTime(interval.to).setTimezone(timezone).minutes;
-                        from = from < to && from > 0 ? from : 0;
-                        busyTimes.push([from, to]);
-                    });
+            Object.keys(schedule).forEach(function (name) {
+                schedule[name].forEach(function (interval) {
+                    var from = new Moment(interval.from).setTimezone(timezone).moment;
+                    var to = new Moment(interval.to).setTimezone(timezone).moment;
+                    from = from < to && from > 0 ? from : 0;
+                    busyTimes.push([from, to]);
                 });
+            });
 
             return busyTimes;
         }
@@ -102,16 +101,16 @@ Object.defineProperties(AppropriateMoment.prototype, {
                 });
         }
     },
-    run: {
+    getMoments: {
         value: function (duration) {
             var robberyMoments = [];
-            while (this._start.minutes + duration <= this._deadline.minutes) {
-                var badIntervals = this._getBadIntervals(this._start.minutes, duration);
+            while (this._start.moment + duration <= this._deadline.moment) {
+                var badIntervals = this._getBadIntervals(this._start.moment, duration);
                 if (badIntervals.length === 0) {
-                    robberyMoments.push(this._start.minutes);
-                    this._start.minutes += 30;
+                    robberyMoments.push(this._start.moment);
+                    this._start.moment += 30;
                 } else {
-                    this._start.minutes = Math.max.apply(Math, badIntervals);
+                    this._start.moment = Math.max.apply(Math, badIntervals);
                 }
             }
 
@@ -129,8 +128,8 @@ Object.defineProperties(AppropriateMoment.prototype, {
  * @returns {Object}
  */
 exports.getAppropriateMoment = function (schedule, duration, workingHours) {
-    var robbery = new AppropriateMoment(schedule, workingHours);
-    var robberyMoments = robbery.run(duration);
+    var appropriateMoment = new AppropriateMoment(schedule, workingHours);
+    var robberyMoments = appropriateMoment.getMoments(duration);
     var exists = robberyMoments.length !== 0;
     var time = robberyMoments.shift();
 
@@ -160,8 +159,8 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
             var minutes = (time % DAY) % HOUR;
 
             return template.replace('%DD', day)
-                .replace('%HH', (hour < 10 ? '0' : '') + hour)
-                .replace('%MM', (minutes < 10 ? '0' : '') + minutes);
+                            .replace('%HH', (hour < 10 ? '0' : '') + hour)
+                            .replace('%MM', (minutes < 10 ? '0' : '') + minutes);
         },
 
         /**
