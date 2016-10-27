@@ -25,11 +25,6 @@ Object.defineProperties(DateTime.prototype, {
                 Number(tokens[2]) * HOUR + Number(tokens[3]);
         }
     },
-    _toTime: {
-        value: function (minutes) {
-            return (minutes < 10 ? '0' : '') + minutes;
-        }
-    },
     minutes: {
         get: function () {
             return this._minutes;
@@ -45,69 +40,56 @@ Object.defineProperties(DateTime.prototype, {
 
             return this;
         }
-    },
-    toString: {
-        value: function () {
-            var day = WEEK[Math.floor(this._minutes / DAY)];
-            var hour = this._toTime(Math.floor((this._minutes % DAY) / HOUR));
-            var minutes = this._toTime((this._minutes % DAY) % HOUR);
-
-            return day + ' ' + hour + ':' + minutes + '+' + this.timezone;
-        }
     }
 });
 
-var AppropriateMoment = function (schedule, duration, workingHours) {
-    this._init(schedule, duration, workingHours);
+var AppropriateMoment = function (schedule, workingHours) {
+    this._init(schedule, workingHours);
 };
 
 Object.defineProperties(AppropriateMoment.prototype, {
     _init: {
-        value: function (schedule, duration, workingHours) {
-            this._workingHours = workingHours;
-            this._schedule = schedule;
+        value: function (schedule, workingHours) {
             this._robberyWeek = WEEK.slice(0, 3);
             this._start = new DateTime(workingHours.from);
             this._deadline = new DateTime(this._robberyWeek[2].concat(workingHours.to));
-            this._duration = duration;
-            this._badIntervals = this._notWorkingHours.concat(this._scheduleIntervals);
-            this._exists = this._run();
+            this._badIntervals = this._getBankCloseIntervals(workingHours)
+                .concat(this._getGangsBusyIntervals(schedule));
         }
     },
-    _notWorkingHours: {
-        get: function () {
+    _getBankCloseIntervals: {
+        value: function (workingHours) {
             var notWorkingTime = [];
             for (var index = 0; index < this._robberyWeek.length - 1; index++) {
                 notWorkingTime.push([
-                    new DateTime(WEEK[index].concat(this._workingHours.to)).minutes,
-                    new DateTime(WEEK[index + 1].concat(this._workingHours.from)).minutes
+                    new DateTime(WEEK[index].concat(workingHours.to)).minutes,
+                    new DateTime(WEEK[index + 1].concat(workingHours.from)).minutes
                 ]);
             }
 
             return notWorkingTime;
         }
     },
-    _scheduleIntervals: {
-        get: function () {
+    _getGangsBusyIntervals: {
+        value: function (schedule) {
             var timezone = this._deadline.timezone;
-            var schedule = this._schedule;
-            var bisyTimes = [];
+            var busyTimes = [];
             Object.keys(schedule)
                 .forEach(function (name) {
                     schedule[name].forEach(function (interval) {
                         var from = new DateTime(interval.from).setTimezone(timezone).minutes;
                         var to = new DateTime(interval.to).setTimezone(timezone).minutes;
                         from = from < to && from > 0 ? from : 0;
-                        bisyTimes.push([from, to]);
+                        busyTimes.push([from, to]);
                     });
                 });
 
-            return bisyTimes;
+            return busyTimes;
         }
     },
     _getBadIntervals: {
-        value: function (start) {
-            var end = start + this._duration;
+        value: function (start, duration) {
+            var end = start + duration;
 
             return this._badIntervals
                 .filter(function (interval) {
@@ -120,46 +102,20 @@ Object.defineProperties(AppropriateMoment.prototype, {
                 });
         }
     },
-    _run: {
-        value: function () {
-            while (this._start.minutes + this._duration <= this._deadline.minutes) {
-                var badIntervals = this._getBadIntervals(this._start.minutes);
+    run: {
+        value: function (duration) {
+            var robberyMoments = [];
+            while (this._start.minutes + duration <= this._deadline.minutes) {
+                var badIntervals = this._getBadIntervals(this._start.minutes, duration);
                 if (badIntervals.length === 0) {
-                    this._time = this._start.minutes;
-
-                    return true;
+                    robberyMoments.push(this._start.minutes);
+                    this._start.minutes += 30;
+                } else {
+                    this._start.minutes = Math.max.apply(Math, badIntervals);
                 }
-                this._start.minutes = Math.max.apply(Math, badIntervals);
             }
-            this._start.minutes = this._time;
 
-            return false;
-        }
-    },
-    exists: {
-        value: function () {
-
-            return this._exists;
-        }
-    },
-    format: {
-        value: function (template) {
-            if (isNaN(this._time)) {
-                return '';
-            }
-            template = template.replace('%DD', '$1')
-                .replace('%HH', '$2')
-                .replace('%MM', '$3');
-
-            return this._start.toString()
-                .replace(DATE, template);
-        }
-    },
-    tryLater: {
-        value: function () {
-            this._start.minutes += 30;
-
-            return this._run();
+            return robberyMoments;
         }
     }
 });
@@ -173,7 +129,10 @@ Object.defineProperties(AppropriateMoment.prototype, {
  * @returns {Object}
  */
 exports.getAppropriateMoment = function (schedule, duration, workingHours) {
-    var robbery = new AppropriateMoment(schedule, duration, workingHours);
+    var robbery = new AppropriateMoment(schedule, workingHours);
+    var robberyMoments = robbery.run(duration);
+    var exists = robberyMoments.length !== 0;
+    var time = robberyMoments.shift();
 
     return {
 
@@ -182,7 +141,7 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {Boolean}
          */
         exists: function () {
-            return robbery.exists();
+            return exists;
         },
 
         /**
@@ -193,7 +152,16 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {String}
          */
         format: function (template) {
-            return robbery.format(template);
+            if (!time) {
+                return '';
+            }
+            var day = WEEK[Math.floor(time / DAY)];
+            var hour = (Math.floor((time % DAY) / HOUR));
+            var minutes = ((time % DAY) % HOUR);
+
+            return template.replace('%DD', day)
+                .replace('%HH', (hour < 10 ? '0' : '') + hour)
+                .replace('%MM', (minutes < 10 ? '0' : '') + minutes);
         },
 
         /**
@@ -202,7 +170,10 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          * @returns {Boolean}
          */
         tryLater: function () {
-            return robbery.tryLater();
+            var oldTime = time;
+            time = robberyMoments.shift() || oldTime;
+
+            return time !== oldTime;
         }
     };
 };
