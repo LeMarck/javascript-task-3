@@ -55,7 +55,7 @@ Object.defineProperties(Robbery.prototype, {
             return this._getBankCloseIntervals(workingHours)
                 .concat(this._getGangsBusyIntervals(schedule))
                 .sort(function (first, second) {
-                    return first[1] < second[1];
+                    return first.to < second.to;
                 });
         }
     },
@@ -63,10 +63,10 @@ Object.defineProperties(Robbery.prototype, {
         value: function (workingHours) {
             var notWorkingTime = [];
             for (var index = 0; index < this._robberyWeek.length - 1; index++) {
-                notWorkingTime.push([
-                    new Moment(WEEK[index] + workingHours.to).minutes,
-                    new Moment(WEEK[index + 1] + workingHours.from).minutes
-                ]);
+                notWorkingTime.push({
+                    from: new Moment(WEEK[index] + workingHours.to).minutes,
+                    to: new Moment(WEEK[index + 1] + workingHours.from).minutes
+                });
             }
 
             return notWorkingTime;
@@ -82,8 +82,10 @@ Object.defineProperties(Robbery.prototype, {
                     schedule[name].reduce(function (acc, interval) {
                         var from = new Moment(interval.from).setTimezone(timezone).minutes;
                         var to = new Moment(interval.to).setTimezone(timezone).minutes;
-                        from = from < to && from > 0 ? from : 0;
-                        acc.push([from, to]);
+                        acc.push({
+                            from: from < to && from > 0 ? from : 0,
+                            to: to
+                        });
 
                         return acc;
                     }, [])
@@ -95,9 +97,9 @@ Object.defineProperties(Robbery.prototype, {
         value: function (start, end) {
             return this._badIntervals
                 .filter(function (interval) {
-                    return (interval[0] <= start && start < interval[1]) ||
-                        (interval[0] < end && end <= interval[1]) ||
-                        (start < interval[0] && interval[1] < end);
+                    return (interval.from <= start && start < interval.to) ||
+                        (interval.from < end && end <= interval.to) ||
+                        (start < interval.from && interval.to < end);
                 });
         }
     },
@@ -107,7 +109,7 @@ Object.defineProperties(Robbery.prototype, {
 
             return this._getIntersection(start, end)
                     .map(function (interval) {
-                        return interval[1];
+                        return interval.to;
                     })[0] || start;
         }
     },
