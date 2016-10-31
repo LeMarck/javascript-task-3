@@ -14,27 +14,17 @@ var TIME_SHIFT = 30;
 
 
 var Moment = function (time) {
-    this._init(time);
+    var tokens = MOMENT_PATTERN.exec(time);
+    this.timezone = Number(tokens[4]);
+    this.minutes = WEEK.indexOf(tokens[1] || 'ПН') * DAY +
+        Number(tokens[2]) * HOUR + Number(tokens[3]);
+    this.setTimezone = function (timezone) {
+        this.minutes -= (this.timezone - timezone) * HOUR;
+        this.timezone = timezone;
+
+        return this;
+    };
 };
-
-Object.defineProperties(Moment.prototype, {
-    _init: {
-        value: function (time) {
-            var tokens = MOMENT_PATTERN.exec(time);
-            this.timezone = Number(tokens[4]);
-            this.minutes = WEEK.indexOf(tokens[1] || 'ПН') * DAY +
-                Number(tokens[2]) * HOUR + Number(tokens[3]);
-        }
-    },
-    setTimezone: {
-        value: function (timezone) {
-            this.minutes -= (this.timezone - timezone) * HOUR;
-            this.timezone = timezone;
-
-            return this;
-        }
-    }
-});
 
 var Robbery = function (schedule, workingHours) {
     this._init(schedule, workingHours);
@@ -103,27 +93,25 @@ Object.defineProperties(Robbery.prototype, {
                 });
         }
     },
-    _timeShift: {
-        value: function (start, duration) {
-            var end = start + duration;
-
-            return this._getIntersection(start, end)
+    _shiftTime: {
+        value: function (moment, duration) {
+            return this._getIntersection(moment, moment + duration)
                     .map(function (interval) {
                         return interval.to;
-                    })[0] || start;
+                    })[0] || moment;
         }
     },
     getMoments: {
         value: function (duration) {
-            var start = this._start.minutes;
+            var moment = this._start.minutes;
             var robberyMoments = [];
-            while (start + duration <= this._deadline.minutes) {
-                var newStart = this._timeShift(start, duration);
-                if (newStart === start) {
-                    robberyMoments.push(start);
-                    start += TIME_SHIFT;
+            while (moment + duration <= this._deadline.minutes) {
+                var newMoment = this._shiftTime(moment, duration);
+                if (newMoment === moment) {
+                    robberyMoments.push(moment);
+                    moment += TIME_SHIFT;
                 } else {
-                    start = newStart;
+                    moment = newMoment;
                 }
             }
 
@@ -183,7 +171,9 @@ exports.getAppropriateMoment = function (schedule, duration, workingHours) {
          */
         tryLater: function () {
             var oldTime = time;
-            time = robberyMoments.shift() || oldTime;
+            if (robberyMoments.length) {
+                time = robberyMoments.shift();
+            }
 
             return time !== oldTime;
         }
