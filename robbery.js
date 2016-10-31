@@ -67,19 +67,17 @@ Object.defineProperties(Robbery.prototype, {
             var timezone = this._deadline.timezone;
             var robbers = Object.keys(schedule);
 
-            return robbers.reduce(function (res, name) {
-                return res.concat(
-                    schedule[name].reduce(function (acc, interval) {
-                        var from = new Moment(interval.from).setTimezone(timezone).minutes;
-                        var to = new Moment(interval.to).setTimezone(timezone).minutes;
-                        acc.push({
-                            from: from < to && from > 0 ? from : 0,
-                            to: to
-                        });
+            return robbers.reduce(function (acc, name) {
+                schedule[name].forEach(function (interval) {
+                    var from = new Moment(interval.from).setTimezone(timezone).minutes;
+                    var to = new Moment(interval.to).setTimezone(timezone).minutes;
+                    acc.push({
+                        from: from < to && from > 0 ? from : 0,
+                        to: to
+                    });
+                });
 
-                        return acc;
-                    }, [])
-                );
+                return acc;
             }, []);
         }
     },
